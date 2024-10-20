@@ -27,7 +27,6 @@ holidays:
       - "christmas/Snow Globe Plex Pre-roll.mp4"
       - "christmas/Another Pre-roll.mp4"
     selection_mode: "random"  # Options: "random", "sequential"
-    last_index: 0  # Used for "sequential" mode
 
   - name: "Valentine's Day"
     start_date: "02-01"
@@ -35,8 +34,6 @@ holidays:
     pre_rolls:
       - "valentine/Valentine Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
-
 
   - name: "Easter"
     start_date: "03-20"
@@ -44,7 +41,6 @@ holidays:
     pre_rolls:
       - "easter/Easter Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
 
   - name: "Mother"
     start_date: "05-05"
@@ -52,7 +48,6 @@ holidays:
     pre_rolls:
       - "mother/Mother's Day Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
 
   - name: "Memorial"
     start_date: "05-18"
@@ -60,7 +55,6 @@ holidays:
     pre_rolls:
       - "memorial/Memorial Day Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
 
   - name: "Independence"
     start_date: "06-23"
@@ -68,7 +62,6 @@ holidays:
     pre_rolls:
       - "independence/Independence Day Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
 
   - name: "Labor"
     start_date: "09-01"
@@ -76,15 +69,14 @@ holidays:
     pre_rolls:
       - "labor/Labor Day Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
 
   - name: "Halloween"
     start_date: "10-01"
     end_date: "10-31"
     pre_rolls:
       - "halloween/Halloween Pre-roll.mp4"
-    selection_mode: "random"
-    last_index: 0
+      - "halloween/Halloween Pre-roll2.mp4"
+    selection_mode: "sequential"
 
   - name: "Thanksgiving"
     start_date: "11-01"
@@ -92,7 +84,6 @@ holidays:
     pre_rolls:
       - "thanksgiving/Thanksgiving Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
 
   - name: "Christmas"
     start_date: "12-01"
@@ -100,4 +91,3 @@ holidays:
     pre_rolls:
       - "christmas/Christmas Pre-roll.mp4"
     selection_mode: "random"
-    last_index: 0
