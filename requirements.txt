@@ -5,3 +5,4 @@ schedule
 pytz
 plexapi
 dateutil
+cerberus

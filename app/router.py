@@ -9,7 +9,8 @@ triggering updates and checking scheduler status.
 
 from flask import Blueprint, jsonify, request
 import logging
-from app.schedule import trigger_pre_roll_update, get_scheduler_next_run_time
+from app.schedule import trigger_pre_roll_update_thread, get_scheduler_next_run_time
+from app.config import Config
 
 # Define a Blueprint named 'main'
 main_bp = Blueprint('main', __name__)
@@ -39,8 +40,8 @@ def update_pre_roll():
         JSON response indicating success or failure.
     """
     try:
-        # Trigger the pre-roll update process
-        trigger_pre_roll_update()
+        # Trigger the pre-roll update process in a separate thread
+        trigger_pre_roll_update_thread(Config.HOLIDAYS)
         logging.info("Manual pre-roll update triggered via API.")
         return jsonify({"message": "Pre-roll update triggered successfully."}), 200
     except Exception as e:

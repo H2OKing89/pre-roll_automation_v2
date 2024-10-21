@@ -3,63 +3,53 @@
 """
 Main entry point for the Plex Pre-Roll Automation application.
 
-This script initializes logging, starts the scheduler in a separate thread,
-sets up the Flask application, and provides a command-line interface to
-manually trigger pre-roll updates.
+This script initializes logging, validates configurations, starts the scheduler in a separate thread,
+sets up the Flask application, and provides a command-line interface to manually trigger pre-roll updates.
 """
 
 from app.config import Config
-from app.schedule import run_scheduler
+from app.schedule import run_scheduler, trigger_pre_roll_update_thread
 from app.logger import setup_logging
-from app.utils import update_plex_pre_roll, get_current_holiday, select_pre_roll
+from app.utils import trigger_pre_roll_update, get_validated_holidays, get_current_holiday
 from app import create_app
 import threading
 import logging
 import signal
 import sys
 
-def manual_pre_roll_update():
-    """
-    Manually triggers the pre-roll update process.
-
-    This function selects the appropriate pre-roll based on the current holiday
-    and updates the Plex server with the selected pre-roll video.
-    """
-    logging.info("Manual pre-roll update triggered.")
-
-    # Determine the current holiday period
-    holiday = get_current_holiday()
-    if holiday:
-        # Select a pre-roll video based on the holiday's selection mode
-        pre_roll = select_pre_roll(holiday)
-        if pre_roll:
-            # Update Plex with the selected pre-roll video
-            update_plex_pre_roll(pre_roll)
-            logging.info(f"Pre-roll updated manually to: {pre_roll}")
-        else:
-            logging.error("No pre-roll selected for the current holiday.")
-    else:
-        logging.info("No active holiday found. No pre-roll update was performed.")
-
 def main():
     """
-    Main function to start the scheduler and the Flask application or trigger manual update.
+    Main function to validate configurations, start the scheduler, and run the Flask application or trigger manual update.
 
     - Sets up logging.
-    - Checks for command-line arguments to determine operation mode.
+    - Validates configurations.
     - Starts the scheduler in a separate daemon thread.
     - Initializes and runs the Flask web server.
     """
     # Setup logging configuration
     setup_logging()
 
-    # Check if a manual update is requested via CLI argument
+    try:
+        # Validate configurations and retrieve validated holidays
+        valid_holidays = get_validated_holidays()
+        if not valid_holidays:
+            logging.error("No valid holidays found. Exiting application.")
+            sys.exit(1)
+    except Exception as e:
+        logging.error(f"Configuration validation failed: {e}")
+        sys.exit(1)
+
+    # Check for command-line arguments to determine operation mode
     if len(sys.argv) > 1 and sys.argv[1] == "manual-update":
-        manual_pre_roll_update()
-        sys.exit(0)  # Exit after manual update to prevent starting the server
+        try:
+            trigger_pre_roll_update(valid_holidays)
+            sys.exit(0)  # Exit after manual update to prevent starting the server
+        except Exception as e:
+            logging.error(f"Manual update failed: {e}")
+            sys.exit(1)
 
     # Start the scheduler in a separate daemon thread
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread = threading.Thread(target=run_scheduler, args=(valid_holidays,), daemon=True)
     scheduler_thread.start()
 
     logging.info("Scheduler started. Application is running.")

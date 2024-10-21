@@ -3,7 +3,7 @@
 from flask import Flask
 from .config import Config
 from .logger import setup_logging
-from .router import main_bp  # Assuming you have a Blueprint named 'main_bp'
+from .router import main_bp
 
 def create_app():
     """

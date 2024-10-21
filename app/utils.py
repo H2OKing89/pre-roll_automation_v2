@@ -7,29 +7,40 @@ Includes functions to determine current holidays, select appropriate pre-rolls,
 and interact with the Plex API to update pre-roll settings.
 """
 
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-import pytz
-from app.config import Config
 import random
 import os
 import logging
 import requests
 import xml.etree.ElementTree as ET  # Import ElementTree for XML parsing
+from app.config import Config
+from app.validation import validate_holiday_fields, validate_date, check_overlap, validate_pre_roll_files
+from datetime import datetime
+import pytz
+from dateutil.relativedelta import relativedelta
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-def get_current_holiday():
+def get_validated_holidays():
     """
-    Determines the current holiday based on the configuration and current date.
+    Returns the list of validated holidays from the configuration.
+    """
+    return Config.HOLIDAYS
+
+def get_current_holiday(valid_holidays):
+    """
+    Determines the current holiday based on the validated holidays and current date.
+
+    Args:
+        valid_holidays (list): List of validated holiday dictionaries.
 
     Returns:
         dict or None: The current holiday dictionary if within a holiday period, else None.
     """
     try:
-        # Get the current time in the configured timezone
         now = datetime.now(pytz.timezone(Config.TIMEZONE))
         current_year = now.year
 
-        for holiday in Config.HOLIDAYS:
+        for holiday in valid_holidays:
             # Parse start and end dates from the configuration
             start_month, start_day = map(int, holiday['start_date'].split('-'))
             end_month, end_day = map(int, holiday['end_date'].split('-'))
@@ -97,6 +108,25 @@ def select_pre_roll(holiday):
         logging.error(f"Error selecting pre-roll for holiday {holiday['name']}: {e}")
         return None
 
+def get_session_with_retries():
+    """
+    Creates a requests Session with retry logic for robust API communication.
+
+    Returns:
+        requests.Session: Configured session with retries.
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["GET", "PUT"]
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
 def update_plex_pre_roll(pre_roll_path):
     """
     Updates the Plex server's pre-roll setting with the selected video(s) using the Plex API.
@@ -107,7 +137,7 @@ def update_plex_pre_roll(pre_roll_path):
     try:
         # Ensure the path uses forward slashes
         normalized_pre_roll_path = pre_roll_path.replace("\\", "/")
-        
+
         # Construct the API URL based on the Plex settings
         plex_url = f"{Config.PLEX_HOST}/:/prefs"
         params = {
@@ -115,18 +145,29 @@ def update_plex_pre_roll(pre_roll_path):
             "X-Plex-Token": Config.PLEX_TOKEN
         }
 
-        # Send the PUT request to update the pre-roll
-        response = requests.put(plex_url, params=params)
+        # Create a session with retries
+        session = get_session_with_retries()
+
+        # Send the PUT request to update the pre-roll with a timeout
+        response = session.put(plex_url, params=params, timeout=10)  # 10-second timeout
 
         # Check if the response was successful
         if response.status_code == 200:
             logging.info(f"Pre-roll update request sent successfully for: {normalized_pre_roll_path}")
-            
+
             # Verification step: Check if the pre-roll was updated correctly
             verify_plex_pre_roll(normalized_pre_roll_path)
+        elif response.status_code == 401:
+            logging.error("Authentication failed. Check your Plex token.")
+        elif response.status_code == 404:
+            logging.error("Plex API endpoint not found. Check the host URL.")
         else:
             logging.error(f"Failed to update Plex pre-roll. Status Code: {response.status_code}. Response: {response.text}")
 
+    except requests.exceptions.Timeout:
+        logging.error("Request timed out while updating Plex pre-roll.")
+    except requests.exceptions.ConnectionError:
+        logging.error("Connection error occurred while updating Plex pre-roll.")
     except Exception as e:
         logging.error(f"Exception occurred while updating Plex pre-roll: {e}")
 
@@ -144,8 +185,11 @@ def verify_plex_pre_roll(expected_pre_roll):
             "X-Plex-Token": Config.PLEX_TOKEN
         }
 
-        # Send a GET request to retrieve Plex preferences
-        response = requests.get(plex_url, params=params)
+        # Create a session with retries
+        session = get_session_with_retries()
+
+        # Send a GET request to retrieve Plex preferences with a timeout
+        response = session.get(plex_url, params=params, timeout=10)
 
         # Check if the response was successful
         if response.status_code == 200:
@@ -178,19 +222,24 @@ def verify_plex_pre_roll(expected_pre_roll):
 
     except ET.ParseError as pe:
         logging.error(f"XML parsing error while verifying Plex pre-roll: {pe}")
+    except requests.exceptions.Timeout:
+        logging.error("Request timed out while verifying Plex pre-roll.")
+    except requests.exceptions.ConnectionError:
+        logging.error("Connection error occurred while verifying Plex pre-roll.")
     except Exception as e:
         logging.error(f"Exception occurred while verifying Plex pre-roll: {e}")
 
-def trigger_pre_roll_update():
+def trigger_pre_roll_update(valid_holidays):
     """
     Triggers the pre-roll update process.
 
-    This function is called by the scheduler or API endpoint to initiate the pre-roll update.
+    Args:
+        valid_holidays (list): List of validated holiday dictionaries.
     """
     try:
         logging.info("Triggering pre-roll update...")
         # Determine the current holiday
-        holiday = get_current_holiday()
+        holiday = get_current_holiday(valid_holidays)
         if holiday:
             # Select the appropriate pre-roll video(s)
             pre_roll = select_pre_roll(holiday)
